@@ -1,0 +1,22 @@
+При додаванні в файл index.ts лишньої змінної та запуску git hook run pre-commit отримали такий вивід в консоль
+
+git commit -m "test"                           
+> storage-controller@1.0.0 format:check
+> prettier . --check
+Checking formatting...
+All matched files use Prettier code style!
+> storage-controller@1.0.0 lint
+> eslint src --max-warnings 0
+  4:7  error  'testSmoke' is assigned a value but never used  @typescript-eslint/no-unused-vars
+✖ 1 problem (1 error, 0 warnings)
+husky - pre-commit script failed (code 1)
+
+
+Після того як лишню змінну було прибрано результат виводу став штатним
+
+> storage-controller@1.0.0 format:check
+> prettier . --check
+Checking formatting...
+All matched files use Prettier code style!
+> storage-controller@1.0.0 lint
+> eslint src --max-warnings 0
