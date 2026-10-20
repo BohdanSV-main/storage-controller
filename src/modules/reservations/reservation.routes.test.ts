@@ -7,7 +7,7 @@ beforeEach(async () => {
   cookies = await ctx.login();
 });
 afterEach(async () => {
-  await ctx.app.close();
+  await ctx?.app.close();
 });
 function create(quantity = 2, key = 'first', session = cookies) {
   return ctx.app.inject({

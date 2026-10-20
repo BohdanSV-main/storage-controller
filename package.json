@@ -6,7 +6,7 @@
   "author": "",
   "type": "module",
   "scripts": {
-    "test": "vitest run src --exclude frontend/** --exclude **/*.db.test.ts",
+    "test": "vitest run src --exclude frontend/** --exclude **/*.db.test.ts --maxWorkers=1",
     "build": "tsc -p tsconfig.json && node scripts/write-version.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start": "node --env-file=.env dist/index.js",

@@ -7,7 +7,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   vi.restoreAllMocks();
-  await ctx.app.close();
+  await ctx?.app.close();
 });
 
 test('login returns public data; logout revokes the session', async () => {
