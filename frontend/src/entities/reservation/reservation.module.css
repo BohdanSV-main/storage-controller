@@ -1,0 +1,20 @@
+.badge {
+  display: inline-block;
+  padding: 6px 10px;
+  border: 1px solid currentColor;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ACTIVE {
+  background: #f9e6a4;
+  color: #694c0b;
+}
+.CANCELLED {
+  background: #eae5dc;
+  color: #686154;
+}
+.ISSUED {
+  background: #e0ece5;
+  color: #216b60;
+}

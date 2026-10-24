@@ -1,0 +1,92 @@
+.header {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  padding: 24px max(24px, calc((100vw - 1116px) / 2));
+  border-bottom: 2px solid var(--ink);
+  background: var(--paper);
+}
+.logo {
+  font-size: 31px;
+  font-weight: 800;
+  letter-spacing: -1.7px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+}
+.logo span {
+  color: var(--red);
+  margin-left: -8px;
+}
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex: 1;
+}
+.nav a {
+  font-size: 13px;
+  text-decoration: none;
+  padding: 12px 0;
+  border-bottom: 2px solid transparent;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.nav a[aria-current] {
+  border-color: var(--red);
+  color: var(--red);
+}
+.account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+}
+.account small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  margin-top: 4px;
+}
+@media (max-width: 1000px) {
+  .header {
+    flex-wrap: wrap;
+    gap: 18px 28px;
+  }
+  .account {
+    margin-left: auto;
+  }
+  .nav {
+    order: 3;
+    flex-basis: 100%;
+  }
+}
+@media (max-width: 600px) {
+  .header {
+    padding: 18px 20px;
+  }
+  .account > svg {
+    display: none;
+  }
+  .account strong {
+    display: block;
+    max-width: 120px;
+  }
+  .logo {
+    font-size: 26px;
+  }
+  .account {
+    gap: 8px;
+  }
+  .nav {
+    justify-content: space-between;
+  }
+  .account button {
+    padding: 6px;
+    box-shadow: none;
+  }
+  .account button svg {
+    display: none;
+  }
+}
