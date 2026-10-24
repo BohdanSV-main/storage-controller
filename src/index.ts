@@ -1,3 +1,4 @@
+import { withLog } from './log.js';
 import { buildApp } from './app.js';
 import { readFileSync } from 'node:fs';
 import { readConfig } from './config.js';
@@ -18,88 +19,92 @@ import { createPrismaReservationReadRepo } from './infrastructure/database/reser
 import { createPrismaSessionStore } from './infrastructure/database/session.prisma-store.js';
 import { startSessionCleanup } from './infrastructure/database/session-cleanup.js';
 
-const versionFile = new URL('./version.txt', import.meta.url);
-const sha = readFileSync(versionFile, 'utf8').trim();
+await withLog(async () => {
+  const versionFile = new URL('./version.txt', import.meta.url);
+  const sha = readFileSync(versionFile, 'utf8').trim();
 
-const config = readConfig();
+  const config = readConfig();
 
-const connectionString = process.env['DATABASE_URL'];
+  const connectionString = process.env['DATABASE_URL'];
 
-if (!connectionString) {
-  throw new Error('DATABASE_URL is required.');
-}
-
-const prisma = createPrismaClient(connectionString);
-const sessionStore = createPrismaSessionStore(prisma);
-
-const app = buildApp(sha, config, {
-  sessionStore,
-});
-
-let stopSessionCleanup: (() => Promise<void>) | undefined;
-
-app.addHook('onClose', async () => {
-  try {
-    await stopSessionCleanup?.();
-  } finally {
-    await prisma.$disconnect();
+  if (!connectionString) {
+    throw new Error('DATABASE_URL is required.');
   }
-});
 
-try {
-  await prisma.$connect();
-  stopSessionCleanup = startSessionCleanup(prisma, app.log);
+  const prisma = createPrismaClient(connectionString);
+  const sessionStore = createPrismaSessionStore(prisma);
 
-  const userRepo = createPrismaUserRepo(prisma);
-  const authService = createAuthService({
-    userRepo,
-    passwordHasher: argon2Hasher,
-  });
-  registerAuthRoutes(app, authService);
-
-  const catalogRepo = createPrismaCatalogRepo(prisma);
-  const catalogService = createCatalogService(catalogRepo);
-
-  registerCatalogRoutes(app, {
-    authService,
-    catalogService,
-  });
-  const reservationRepo = createPrismaReservationRepo(prisma);
-  const reservationService = createReservationService(reservationRepo);
-
-  registerReservationRoutes(app, {
-    authService,
-    reservationService,
+  const app = buildApp(sha, config, {
+    sessionStore,
   });
 
-  const reservationReadRepo = createPrismaReservationReadRepo(prisma);
+  let stopSessionCleanup: (() => Promise<void>) | undefined;
 
-  const reservationReadService =
-    createReservationReadService(reservationReadRepo);
-
-  registerReservationReadRoutes(app, {
-    authService,
-    reservationReadService,
+  app.addHook('onClose', async () => {
+    try {
+      await stopSessionCleanup?.();
+    } finally {
+      await prisma.$disconnect();
+    }
   });
 
-  await app.listen({ port: 3000, host: '127.0.0.1' });
+  try {
+    await prisma.$connect();
+    stopSessionCleanup = startSessionCleanup(prisma, app.log);
 
-  const shutdown = (): void => {
-    app.close().catch((error: unknown) => {
-      app.log.error(error);
-      process.exitCode = 1;
+    const userRepo = createPrismaUserRepo(prisma);
+    const authService = createAuthService({
+      userRepo,
+      passwordHasher: argon2Hasher,
     });
-  };
+    registerAuthRoutes(app, authService);
 
-  process.once('SIGINT', shutdown);
-  process.once('SIGTERM', shutdown);
-} catch (err) {
-  app.log.error(err);
-  process.exitCode = 1;
+    const catalogRepo = createPrismaCatalogRepo(prisma);
+    const catalogService = createCatalogService(catalogRepo);
 
-  try {
-    await app.close();
-  } finally {
-    await prisma.$disconnect();
+    registerCatalogRoutes(app, {
+      authService,
+      catalogService,
+    });
+    const reservationRepo = createPrismaReservationRepo(prisma);
+    const reservationService = createReservationService(reservationRepo);
+
+    registerReservationRoutes(app, {
+      authService,
+      reservationService,
+    });
+
+    const reservationReadRepo = createPrismaReservationReadRepo(prisma);
+
+    const reservationReadService =
+      createReservationReadService(reservationReadRepo);
+
+    registerReservationReadRoutes(app, {
+      authService,
+      reservationReadService,
+    });
+
+    await app.listen({ port: 3000, host: '127.0.0.1' });
+
+    const shutdown = (): void => {
+      void withLog(() =>
+        app.close().catch((error: unknown) => {
+          app.log.error(error);
+          process.exitCode = 1;
+        }),
+      );
+    };
+
+    process.once('SIGINT', shutdown);
+    process.once('SIGTERM', shutdown);
+  } catch (err) {
+    app.log.error(err);
+    process.exitCode = 1;
+
+    try {
+      await app.close();
+    } finally {
+      await prisma.$disconnect();
+    }
   }
-}
+});

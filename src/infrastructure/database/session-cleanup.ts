@@ -1,3 +1,4 @@
+import { withLog } from '../../log.js';
 import type { FastifyBaseLogger } from 'fastify';
 import type { PrismaClient } from '../../generated/prisma/client.js';
 
@@ -24,7 +25,7 @@ export function startSessionCleanup(
   function cleanup(): void {
     if (running) return;
 
-    running = removeExpiredSessions().finally(() => {
+    running = withLog(removeExpiredSessions).finally(() => {
       running = undefined;
     });
   }
