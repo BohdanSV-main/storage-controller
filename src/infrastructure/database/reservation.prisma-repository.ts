@@ -9,6 +9,7 @@ import type {
   ReservationRepo,
 } from '../../modules/reservations/reservation.repository.js';
 import { runSerializableTx } from './serializable-transaction.js';
+import { log } from '../../log.js';
 
 async function findReplay(
   client: Pick<PrismaClient, 'reservationIdempotencyKey'>,
@@ -54,8 +55,9 @@ export function createPrismaReservationRepo(
         throw new Error('Quantity must be a positive integer');
       }
 
+      let result: CreateReservationResult;
       try {
-        return await runSerializableTx<CreateReservationResult>(
+        result = await runSerializableTx<CreateReservationResult>(
           prisma,
           async (tx) => {
             const existing = await findReplay(tx, input);
@@ -127,12 +129,18 @@ export function createPrismaReservationRepo(
 
         const existing = await findReplay(prisma, input);
 
-        if (existing) {
-          return existing;
-        }
-
-        throw error;
+        if (!existing) throw error;
+        result = existing;
       }
+      log.debug(
+        {
+          result: result.kind,
+          reservationId:
+            'reservation' in result ? result.reservation.id : undefined,
+        },
+        'Reservation creation finished',
+      );
+      return result;
     },
     async cancel(
       input: CancelReservationInput,

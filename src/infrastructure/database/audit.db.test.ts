@@ -12,7 +12,7 @@ import { createPrismaReservationReadRepo } from './reservation-read.prisma-repos
 const url = process.env['DATABASE_URL'];
 if (!url) throw new Error('Run npm run test:db.');
 
-test('list queries stay constant as data grows', async () => {
+test('batched reads avoid N+1', async () => {
   const db = new PrismaClient({
     adapter: new PrismaPg({ connectionString: url }),
     log: [{ emit: 'event', level: 'query' }],
@@ -48,6 +48,32 @@ test('list queries stay constant as data grows', async () => {
         });
         ids.push(item.id);
       }
+
+      count = 0;
+      const rows = await db.reservation.findMany({
+        where: { userId },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      });
+      const naive = [];
+      for (const row of rows) {
+        const product = await db.product.findUniqueOrThrow({
+          where: { id: row.productId },
+          select: { id: true, articleCode: true, name: true },
+        });
+        naive.push({ ...row, product });
+      }
+      const before = count;
+
+      count = 0;
+      const batched = await repo.findByUserId(user.id);
+      const after = count;
+      expect(naive).toHaveLength(size);
+      expect(batched).toEqual(naive);
+      expect(before).toBe(size + 1);
+      expect(after).toBeGreaterThan(0);
+      expect(after).toBeLessThanOrEqual(2);
+      console.info({ rows: size, naive: before, batched: after });
+
       const reads = [
         () => catalog.findAllWithStock(),
         () => repo.findByUserId(user.id),
@@ -80,7 +106,7 @@ test('list queries stay constant as data grows', async () => {
   }
 }, 20_000);
 
-test('returns 503 on connection loss and recovers', async () => {
+test('returns 503 on connection loss', async () => {
   const target = new URL(url);
   const host = target.hostname;
   const port = Number(target.port || 5432);
@@ -119,7 +145,7 @@ test('returns 503 on connection loss and recovers', async () => {
   const app = buildApp(
     'test',
     {
-      sessionSecret: 'test-secret-with-at-least-32-characters',
+      sessionSecret: 'test-secret'.repeat(3),
       appOrigin: 'http://localhost',
       secureCookie: false,
     },

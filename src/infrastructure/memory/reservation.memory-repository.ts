@@ -9,10 +9,23 @@ import type {
 } from '../../modules/reservations/reservation.repository.js';
 import type { MemoryStore, IdempotencyRecord } from './memory-store.js';
 import type { Reservation } from '../../modules/reservations/reservation.types.js';
+import { log } from '../../log.js';
 
 export function createMemoryReservationRepo(
   store: MemoryStore,
 ): ReservationRepo {
+  function finish(result: CreateReservationResult) {
+    log.debug(
+      {
+        result: result.kind,
+        reservationId:
+          'reservation' in result ? result.reservation.id : undefined,
+      },
+      'Reservation creation finished',
+    );
+    return result;
+  }
+
   return {
     async create(
       input: CreateReservationInput,
@@ -30,7 +43,7 @@ export function createMemoryReservationRepo(
           existing.productId !== input.productId ||
           existing.quantity !== input.quantity
         ) {
-          return { kind: 'idempotency-conflict' };
+          return finish({ kind: 'idempotency-conflict' });
         }
 
         const reservation = store.reservations.get(existing.reservationId);
@@ -41,19 +54,22 @@ export function createMemoryReservationRepo(
           );
         }
 
-        return { kind: 'replayed', reservation: structuredClone(reservation) };
+        return finish({
+          kind: 'replayed',
+          reservation: structuredClone(reservation),
+        });
       }
 
       const product = store.products.get(input.productId);
 
       if (!product) {
-        return { kind: 'product-not-found' };
+        return finish({ kind: 'product-not-found' });
       }
 
       const available = product.stock.onHand - product.stock.reserved;
 
       if (input.quantity > available) {
-        return { kind: 'insufficient-stock' };
+        return finish({ kind: 'insufficient-stock' });
       }
 
       const reservation: Reservation = {
@@ -88,7 +104,7 @@ export function createMemoryReservationRepo(
       store.reservationKeys.set(input.userId, userKeys);
       store.nextReservationId += 1;
 
-      return result;
+      return finish(result);
     },
 
     async cancel(

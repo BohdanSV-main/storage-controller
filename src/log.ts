@@ -12,6 +12,7 @@ export function withLog<T>(fn: () => T, id: string = randomUUID()): T {
 export function createLog(stream?: DestinationStream) {
   return pino(
     {
+      level: process.env.LOG_LEVEL ?? 'info',
       mixin(_data, _level, logger) {
         return {
           processId: logger.bindings().reqId ?? ctx.getStore() ?? bootId,
