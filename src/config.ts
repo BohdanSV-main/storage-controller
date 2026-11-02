@@ -4,7 +4,15 @@ export interface AppConfig {
   secureCookie: boolean;
 }
 
-export function readConfig(): AppConfig {
+export interface ServerConfig extends AppConfig {
+  dataSource: 'memory' | 'postgres';
+}
+
+export function readConfig(): ServerConfig {
+  const dataSource = process.env.DATA_SOURCE ?? 'postgres';
+  if (dataSource !== 'memory' && dataSource !== 'postgres') {
+    throw new Error('DATA_SOURCE must be memory or postgres');
+  }
   const sessionSecret = process.env.SESSION_SECRET;
   const appOrigin = process.env.APP_ORIGIN;
 
@@ -25,6 +33,7 @@ export function readConfig(): AppConfig {
   }
 
   return {
+    dataSource,
     sessionSecret,
     appOrigin,
     secureCookie: url.protocol === 'https:',
