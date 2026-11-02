@@ -1,4 +1,5 @@
 import type { PublicUser } from '../auth/user.types.js';
+import { log } from '../../log.js';
 import { isPositiveInt32 } from './reservation.limits.js';
 import type {
   CancelReservationResult,
@@ -52,6 +53,7 @@ export function createReservationService(
         return { kind: 'validation-error' };
       }
 
+      log.debug({ productId, quantity }, 'Creating reservation');
       return repo.create({
         userId: user.id,
         productId,
