@@ -145,7 +145,7 @@ test('returns 503 on connection loss', async () => {
   const app = buildApp(
     'test',
     {
-      sessionSecret: 'test-secret',
+      sessionSecret: 'test-secret'.repeat(3),
       appOrigin: 'http://localhost',
       secureCookie: false,
     },
