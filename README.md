@@ -31,6 +31,23 @@ npm start
 `db:seed` генерує Prisma Client, збирає бекенд і додає початкові дані.
 Після змін бекенду перед запуском виконати `npm run build`.
 
+## Прототип без БД
+
+У `.env` встановити:
+```env
+DATA_SOURCE=memory
+```
+
+```powershell
+npm run db:generate
+npm run build
+npm start
+```
+
+Генерація Prisma Client потрібна тільки для збірки, але підключення до БД не буде бо дані та сесії зберігаються в пам'яті.
+Для роботи з PostgreSQL встановити DATA_SOURCE=postgres.
+Рівень логування: LOG_LEVEL=info. Для детальних логів сервісу й репозиторію використати LOG_LEVEL=debug.
+
 ## Фронтенд
 
 В іншому терміналі:
@@ -56,12 +73,13 @@ Seed не змінює паролі наявних акаунтів.
 
 ## Перевірки
 
-- `npm run check` або `make check`  форматування, lint, типи, тести й збірка бекенду.
-- `npm run test:db`  4 сценарії на PostgreSQL; потрібна налаштована `.env` і міграції. Тестові записи очищаються.
+- `npm run check` або `make check`  форматування, lint, типи, 48 тестів й збірка бекенду.
+- `npm run test:db`  6 тестів PostgreSQL разом з N+1; потрібна налаштована `.env` і міграції. Тестові записи очищаються.
 - `npm --prefix frontend run check`  форматування, lint, типи й збірка фронтенду.
 
 ## Документація
 
 [Специфікація](spec.md) · [API](docs/api.md) · [ADR](docs/adr/) ·
 [Аудит](docs/backend-audit.md) · [Збої БД](docs/database-failures.md) ·
+[Результати перевірок](docs/artifacts/lab2-checks.md)
 [Definition of Done](standards/definition-of-done.md)
