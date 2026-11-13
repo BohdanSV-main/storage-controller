@@ -6,3 +6,7 @@ coverage/
 !.env.example
 *.log
 /src/generated/prisma
+.stryker-tmp/
+reports/mutation/
+playwright-report/
+test-results/

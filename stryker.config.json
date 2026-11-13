@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "testRunner": "command",
+  "commandRunner": {
+    "command": "npx vitest run src/modules/reservations/reservation.service.test.ts --maxWorkers=1"
+  },
+  "coverageAnalysis": "off",
+  "mutate": [
+    "src/modules/reservations/reservation.service.ts",
+    "src/modules/reservations/reservation.limits.ts"
+  ],
+  "reporters": ["clear-text", "html", "json"],
+  "concurrency": 1
+}

@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "test": "vitest run src --exclude frontend/** --exclude **/*.db.test.ts --maxWorkers=1",
-    "build": "tsc -p tsconfig.json && node scripts/write-version.js",
+    "build": "tsc -p tsconfig.build.json && node scripts/write-version.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start": "node --env-file=.env dist/index.js",
     "format": "prettier . --write",
@@ -18,19 +18,27 @@
     "prepare": "husky",
     "db:generate": "prisma generate",
     "db:seed": "npm run db:generate && npm run build && node --env-file=.env dist/infrastructure/database/seed.js",
-    "test:db": "node --env-file=.env node_modules/vitest/vitest.mjs run .db.test.ts --maxWorkers=1"
+    "test:db": "node --env-file=.env.test node_modules/vitest/vitest.mjs run .db.test.ts --maxWorkers=1",
+    "test:coverage": "npm run test -- --coverage",
+    "mutation": "stryker run",
+    "test:prepare": "npm run db:test:prepare && playwright install chromium",
+    "test:e2e": "npm run build && npm --prefix frontend run build && playwright test",
+    "db:test:prepare": "node --env-file=.env --env-file=.env.test node_modules/prisma/build/index.js migrate deploy --config prisma7.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "1.65.0",
+    "@stryker-mutator/core": "10.1.1",
     "@types/node": "^24.19.0",
     "@types/pg": "^8.23.1",
+    "@vitest/coverage-v8": "5.0.2",
     "eslint": "^10.11.0",
     "husky": "^9.1.7",
     "prettier": "3.9.9",
     "prisma": "7.10.1",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.71.0",
-    "vitest": "^5.0.2"
+    "vitest": "5.0.2"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.3",
