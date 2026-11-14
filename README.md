@@ -71,15 +71,30 @@ npm run dev
 
 Seed не змінює паролі наявних акаунтів.
 
+## Тестування
+
+Для інтеграційних та E2E-тестів потрібна окрема БД storage_controller_test.
+У .env.test вкажіть DATABASE_URL цієї БД та налаштування сесії.
+
+Підготовка:
+
+```sh
+npm run db:test:prepare
+npm run test:prepare
+
 ## Перевірки
 
-- `npm run check` або `make check`  форматування, lint, типи, 48 тестів й збірка бекенду.
-- `npm run test:db`  6 тестів PostgreSQL разом з N+1; потрібна налаштована `.env` і міграції. Тестові записи очищаються.
+- `npm run check` або `make check`  форматування, lint, типи, 67 тестів й збірка бекенду.
+- `npm run test:db`  8 тестів PostgreSQL разом з N+1; потрібна налаштована `.env` і міграції. Тестові записи очищаються.
 - `npm --prefix frontend run check`  форматування, lint, типи й збірка фронтенду.
+- `npm run test:prepare`  міграції тестової БД та встановлення Chromium; потрібна `.env.test` із DATABASE_URL для storage_controller_test.
+- `npm run test:coverage`  покриття коду, включно з гілками.
+- `npm run test:e2e`  4 сценарії у Chromium; порти 3000 і 4173 мають бути вільні.
+- `npm run mutation` або `make mutation`  мутаційні перевірки сервісу резервування та числових меж.
 
 ## Документація
 
 [Специфікація](spec.md) · [API](docs/api.md) · [ADR](docs/adr/) ·
-[Аудит](docs/backend-audit.md) · [Збої БД](docs/database-failures.md) ·
+[Аудит](docs/backend-audit.md) · [Збої БД](docs/database-failures.md) · [Аудит тестів](docs/testing-audit.md) · 
 [Результати перевірок](docs/artifacts/lab2-checks.md)
 [Definition of Done](standards/definition-of-done.md)
