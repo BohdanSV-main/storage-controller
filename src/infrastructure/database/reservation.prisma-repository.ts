@@ -145,128 +145,144 @@ export function createPrismaReservationRepo(
     async cancel(
       input: CancelReservationInput,
     ): Promise<CancelReservationResult> {
-      return runSerializableTx<CancelReservationResult>(prisma, async (tx) => {
-        const reservation = await tx.reservation.findUnique({
-          where: { id: input.reservationId },
-        });
+      const result = await runSerializableTx<CancelReservationResult>(
+        prisma,
+        async (tx) => {
+          const reservation = await tx.reservation.findUnique({
+            where: { id: input.reservationId },
+          });
 
-        if (!reservation) {
-          return { kind: 'not-found' };
-        }
+          if (!reservation) {
+            return { kind: 'not-found' };
+          }
 
-        if (reservation.userId !== input.userId) {
-          return { kind: 'forbidden' };
-        }
+          if (reservation.userId !== input.userId) {
+            return { kind: 'forbidden' };
+          }
 
-        if (reservation.status === 'CANCELLED') {
+          if (reservation.status === 'CANCELLED') {
+            return {
+              kind: 'replayed',
+              reservation,
+            };
+          }
+
+          if (reservation.status !== 'ACTIVE') {
+            return { kind: 'invalid-status' };
+          }
+
+          const stock = await tx.stock.findUnique({
+            where: { productId: reservation.productId },
+          });
+
+          if (!stock) {
+            throw new Error(
+              `Stock record is missing for product ${reservation.productId}.`,
+            );
+          }
+
+          if (stock.reserved < reservation.quantity) {
+            throw new Error(
+              'Reserved stock is inconsistent with the reservation.',
+            );
+          }
+
+          await tx.stock.update({
+            where: { productId: reservation.productId },
+            data: {
+              reserved: { decrement: reservation.quantity },
+            },
+          });
+
+          const cancelled = await tx.reservation.update({
+            where: { id: reservation.id },
+            data: {
+              status: 'CANCELLED',
+              closedAt: new Date(),
+              issuedById: null,
+            },
+          });
+
           return {
-            kind: 'replayed',
-            reservation,
+            kind: 'cancelled',
+            reservation: cancelled,
           };
-        }
-
-        if (reservation.status !== 'ACTIVE') {
-          return { kind: 'invalid-status' };
-        }
-
-        const stock = await tx.stock.findUnique({
-          where: { productId: reservation.productId },
-        });
-
-        if (!stock) {
-          throw new Error(
-            `Stock record is missing for product ${reservation.productId}.`,
-          );
-        }
-
-        if (stock.reserved < reservation.quantity) {
-          throw new Error(
-            'Reserved stock is inconsistent with the reservation.',
-          );
-        }
-
-        await tx.stock.update({
-          where: { productId: reservation.productId },
-          data: {
-            reserved: { decrement: reservation.quantity },
-          },
-        });
-
-        const cancelled = await tx.reservation.update({
-          where: { id: reservation.id },
-          data: {
-            status: 'CANCELLED',
-            closedAt: new Date(),
-            issuedById: null,
-          },
-        });
-
-        return {
-          kind: 'cancelled',
-          reservation: cancelled,
-        };
-      });
+        },
+      );
+      log.debug(
+        { reservationId: input.reservationId, result: result.kind },
+        'Reservation cancellation finished',
+      );
+      return result;
     },
     async issue(input: IssueReservationInput): Promise<IssueReservationResult> {
-      return runSerializableTx<IssueReservationResult>(prisma, async (tx) => {
-        const reservation = await tx.reservation.findUnique({
-          where: { id: input.reservationId },
-        });
+      const result = await runSerializableTx<IssueReservationResult>(
+        prisma,
+        async (tx) => {
+          const reservation = await tx.reservation.findUnique({
+            where: { id: input.reservationId },
+          });
 
-        if (!reservation) {
-          return { kind: 'not-found' };
-        }
+          if (!reservation) {
+            return { kind: 'not-found' };
+          }
 
-        if (reservation.status === 'ISSUED') {
+          if (reservation.status === 'ISSUED') {
+            return {
+              kind: 'replayed',
+              reservation,
+            };
+          }
+
+          if (reservation.status !== 'ACTIVE') {
+            return { kind: 'invalid-status' };
+          }
+
+          const stock = await tx.stock.findUnique({
+            where: { productId: reservation.productId },
+          });
+
+          if (!stock) {
+            throw new Error(
+              `Stock record is missing for ${reservation.productId}.`,
+            );
+          }
+
+          if (
+            stock.onHand < reservation.quantity ||
+            stock.reserved < reservation.quantity
+          ) {
+            throw new Error('Stock is inconsistent with the reservation.');
+          }
+
+          await tx.stock.update({
+            where: { productId: reservation.productId },
+            data: {
+              onHand: { decrement: reservation.quantity },
+              reserved: { decrement: reservation.quantity },
+            },
+          });
+
+          const issued = await tx.reservation.update({
+            where: { id: reservation.id },
+            data: {
+              status: 'ISSUED',
+              closedAt: new Date(),
+              issuedById: input.workerId,
+            },
+          });
+
           return {
-            kind: 'replayed',
-            reservation,
+            kind: 'issued',
+            reservation: issued,
           };
-        }
-
-        if (reservation.status !== 'ACTIVE') {
-          return { kind: 'invalid-status' };
-        }
-
-        const stock = await tx.stock.findUnique({
-          where: { productId: reservation.productId },
-        });
-
-        if (!stock) {
-          throw new Error(
-            `Stock record is missing for product ${reservation.productId}.`,
-          );
-        }
-
-        if (
-          stock.onHand < reservation.quantity ||
-          stock.reserved < reservation.quantity
-        ) {
-          throw new Error('Stock is inconsistent with the reservation.');
-        }
-
-        await tx.stock.update({
-          where: { productId: reservation.productId },
-          data: {
-            onHand: { decrement: reservation.quantity },
-            reserved: { decrement: reservation.quantity },
-          },
-        });
-
-        const issued = await tx.reservation.update({
-          where: { id: reservation.id },
-          data: {
-            status: 'ISSUED',
-            closedAt: new Date(),
-            issuedById: input.workerId,
-          },
-        });
-
-        return {
-          kind: 'issued',
-          reservation: issued,
-        };
-      });
+        },
+      );
+      log.debug(
+        { reservationId: input.reservationId, result: result.kind },
+        'Reservation issuance finished',
+      );
+      return result;
     },
   };
 }

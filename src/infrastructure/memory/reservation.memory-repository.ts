@@ -110,25 +110,32 @@ export function createMemoryReservationRepo(
     async cancel(
       input: CancelReservationInput,
     ): Promise<CancelReservationResult> {
+      function finish(result: CancelReservationResult) {
+        log.debug(
+          { reservationId: input.reservationId, result: result.kind },
+          'Reservation cancellation finished',
+        );
+        return result;
+      }
       const reservation = store.reservations.get(input.reservationId);
 
       if (!reservation) {
-        return { kind: 'not-found' };
+        return finish({ kind: 'not-found' });
       }
 
       if (reservation.userId !== input.userId) {
-        return { kind: 'forbidden' };
+        return finish({ kind: 'forbidden' });
       }
 
       if (reservation.status === 'CANCELLED') {
-        return {
+        return finish({
           kind: 'replayed',
           reservation: structuredClone(reservation),
-        };
+        });
       }
 
       if (reservation.status !== 'ACTIVE') {
-        return { kind: 'invalid-status' };
+        return finish({ kind: 'invalid-status' });
       }
 
       const product = store.products.get(reservation.productId);
@@ -155,24 +162,31 @@ export function createMemoryReservationRepo(
       store.reservations.set(reservation.id, cancelled);
       product.stock.reserved -= reservation.quantity;
 
-      return result;
+      return finish(result);
     },
     async issue(input: IssueReservationInput): Promise<IssueReservationResult> {
+      function finish(result: IssueReservationResult) {
+        log.debug(
+          { reservationId: input.reservationId, result: result.kind },
+          'Reservation issuance finished',
+        );
+        return result;
+      }
       const reservation = store.reservations.get(input.reservationId);
 
       if (!reservation) {
-        return { kind: 'not-found' };
+        return finish({ kind: 'not-found' });
       }
 
       if (reservation.status === 'ISSUED') {
-        return {
+        return finish({
           kind: 'replayed',
           reservation: structuredClone(reservation),
-        };
+        });
       }
 
       if (reservation.status !== 'ACTIVE') {
-        return { kind: 'invalid-status' };
+        return finish({ kind: 'invalid-status' });
       }
 
       const product = store.products.get(reservation.productId);
@@ -204,7 +218,7 @@ export function createMemoryReservationRepo(
       product.stock.onHand -= reservation.quantity;
       product.stock.reserved -= reservation.quantity;
 
-      return result;
+      return finish(result);
     },
   };
 }
