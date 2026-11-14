@@ -9,6 +9,7 @@ const rows = vi.hoisted(
       reqId?: string;
       productId?: number;
       reservationId?: number;
+      result?: string;
     }[],
 );
 
@@ -84,6 +85,75 @@ test('keeps the same ID across layers for parallel POST requests', async () => {
       console.info(group.map(({ processId, msg }) => ({ processId, msg })));
     }
     expect(ids.size).toBe(2);
+
+    const worker = await app.inject({
+      method: 'POST',
+      url: '/auth/login',
+      headers: { origin: 'http://localhost' },
+      payload: { email: 'worker@example.com', password: 'Worker-123!' },
+    });
+    expect(worker.statusCode).toBe(200);
+    const workerCookie = worker.cookies.find(
+      (item) => item.name === 'sessionId',
+    );
+    if (!workerCookie) throw new Error('Missing worker session');
+
+    const actions = [
+      {
+        action: 'cancel',
+        id: replies[0]!.json().id as number,
+        cookie: cookie.value,
+        start: 'Cancelling reservation',
+        finish: 'Reservation cancellation finished',
+        result: 'cancelled',
+      },
+      {
+        action: 'issue',
+        id: replies[1]!.json().id as number,
+        cookie: workerCookie.value,
+        start: 'Issuing reservation',
+        finish: 'Reservation issuance finished',
+        result: 'issued',
+      },
+    ];
+    for (const replay of [false, true]) {
+      rows.length = 0;
+      const responses = await Promise.all(
+        actions.map((action) =>
+          app.inject({
+            method: 'POST',
+            url: `/reservations/${action.id}/${action.action}`,
+            headers: { origin: 'http://localhost' },
+            cookies: { sessionId: action.cookie },
+          }),
+        ),
+      );
+      for (const response of responses) expect(response.statusCode).toBe(200);
+      for (const action of actions) {
+        const start = rows.find(
+          (row) => row.msg === action.start && row.reservationId === action.id,
+        );
+        expect(start?.processId).toBeTruthy();
+        expect(ids.has(start!.processId)).toBe(false);
+        ids.add(start!.processId);
+        const group = rows.filter((row) => row.processId === start!.processId);
+        expect(group.map((row) => row.msg)).toEqual([
+          'incoming request',
+          action.start,
+          action.finish,
+          'request completed',
+        ]);
+        expect(group.find((row) => row.msg === action.finish)).toMatchObject({
+          reservationId: action.id,
+          result: replay ? 'replayed' : action.result,
+        });
+        expect(
+          group
+            .filter((row) => row.reqId)
+            .every((row) => row.reqId === start!.processId),
+        ).toBe(true);
+      }
+    }
   } finally {
     await app.close();
   }

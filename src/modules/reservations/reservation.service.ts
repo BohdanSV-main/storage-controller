@@ -53,7 +53,10 @@ export function createReservationService(
         return { kind: 'validation-error' };
       }
 
-      log.debug({ productId, quantity }, 'Creating reservation');
+      log.debug(
+        { userId: user.id, productId, quantity },
+        'Creating reservation',
+      );
       return repo.create({
         userId: user.id,
         productId,
@@ -70,6 +73,7 @@ export function createReservationService(
         return { kind: 'validation-error' };
       }
 
+      log.debug({ userId: user.id, reservationId }, 'Cancelling reservation');
       return repo.cancel({
         reservationId,
         userId: user.id,
@@ -84,6 +88,7 @@ export function createReservationService(
         return { kind: 'validation-error' };
       }
 
+      log.debug({ workerId: user.id, reservationId }, 'Issuing reservation');
       return repo.issue({
         reservationId,
         workerId: user.id,

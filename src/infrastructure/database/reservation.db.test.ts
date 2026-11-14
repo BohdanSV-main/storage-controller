@@ -1,7 +1,28 @@
 import { randomUUID } from 'node:crypto';
-import { beforeEach, afterEach, afterAll, expect, test } from 'vitest';
+import { beforeEach, afterEach, afterAll, expect, test, vi } from 'vitest';
+import { withLog } from '../../log.js';
 import { createPrismaClient } from './prisma-client.js';
 import { createPrismaReservationRepo } from './reservation.prisma-repository.js';
+
+const logs = vi.hoisted(
+  () =>
+    [] as {
+      msg: string;
+      processId: string;
+      result?: string;
+      reservationId?: number;
+    }[],
+);
+vi.mock('../../log.js', async (original) => {
+  const mod = await original<typeof import('../../log.js')>();
+  const log = mod.createLog({
+    write: (line: string) => {
+      logs.push(JSON.parse(line));
+    },
+  });
+  log.level = 'debug';
+  return { ...mod, log };
+});
 
 const url = process.env['DATABASE_URL'];
 if (!url) throw new Error('DATABASE_URL is required. Run npm run test:db.');
@@ -12,6 +33,7 @@ let workerId: number;
 let productId: number;
 
 beforeEach(async () => {
+  logs.length = 0;
   const token = randomUUID();
   const data = await db.$transaction(async (tx) => {
     const user = await tx.user.create({
@@ -85,7 +107,14 @@ test('retries return the same reservation and conflicting payload is rejected', 
 test('cancel and issue update stock only once', async () => {
   const first = await create();
   const cancel = { reservationId: first.id, userId };
-  const cancelled = await repo.cancel(cancel);
+  const cancelled = await withLog(() => repo.cancel(cancel), 'cancel-test');
+  expect(logs.filter((row) => row.processId === 'cancel-test')).toEqual([
+    expect.objectContaining({
+      msg: 'Reservation cancellation finished',
+      reservationId: first.id,
+      result: 'cancelled',
+    }),
+  ]);
   expect(cancelled.kind).toBe('cancelled');
   expect(await repo.cancel(cancel)).toEqual({ ...cancelled, kind: 'replayed' });
   expect(await stock()).toMatchObject({ onHand: 5, reserved: 0 });
@@ -94,10 +123,40 @@ test('cancel and issue update stock only once', async () => {
   });
   const second = await create('second');
   const issue = { reservationId: second.id, workerId };
-  const issued = await repo.issue(issue);
+  const issued = await withLog(() => repo.issue(issue), 'issue-test');
+  expect(logs.filter((row) => row.processId === 'issue-test')).toEqual([
+    expect.objectContaining({
+      msg: 'Reservation issuance finished',
+      reservationId: second.id,
+      result: 'issued',
+    }),
+  ]);
   expect(issued.kind).toBe('issued');
   expect(await repo.issue(issue)).toEqual({ ...issued, kind: 'replayed' });
   expect(await stock()).toMatchObject({ onHand: 2, reserved: 0 });
+  expect(
+    logs
+      .filter((row) => row.msg === 'Reservation cancellation finished')
+      .map((row) => row.result),
+  ).toEqual(['cancelled', 'replayed']);
+  expect(
+    logs
+      .filter((row) => row.msg === 'Reservation issuance finished')
+      .map((row) => row.result),
+  ).toEqual(['invalid-status', 'issued', 'replayed']);
+});
+
+test('does not log when the transaction rolls back', async () => {
+  const reservation = await create();
+  logs.length = 0;
+  await expect(
+    repo.issue({ reservationId: reservation.id, workerId: -1 }),
+  ).rejects.toMatchObject({ code: 'P2003' });
+  expect(logs).toEqual([]);
+  expect(await stock()).toMatchObject({ onHand: 5, reserved: 3 });
+  expect(
+    await db.reservation.findUniqueOrThrow({ where: { id: reservation.id } }),
+  ).toMatchObject({ status: 'ACTIVE', issuedById: null });
 });
 
 test('concurrent reservations cannot exceed stock', async () => {

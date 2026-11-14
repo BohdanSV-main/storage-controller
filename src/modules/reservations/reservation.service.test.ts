@@ -50,3 +50,61 @@ test('uses authenticated user and worker IDs', async () => {
   expect(repo.cancel).toHaveBeenCalledWith({ reservationId: 1, userId: 7 });
   expect(repo.issue).toHaveBeenCalledWith({ reservationId: 1, workerId: 8 });
 });
+
+test.each([1, 2147483647])('accepts boundary value %s', async (value) => {
+  const { repo, service } = setup();
+  const command = { ...input, productId: value, quantity: value };
+
+  expect(await service.create(user, command)).toEqual({
+    kind: 'product-not-found',
+  });
+  expect(repo.create).toHaveBeenCalledWith({ ...command, userId: user.id });
+});
+
+test('rejects an invalid product ID', async () => {
+  const { repo, service } = setup();
+
+  expect(await service.create(user, { ...input, productId: 0 })).toEqual({
+    kind: 'validation-error',
+  });
+  expect(repo.create).not.toHaveBeenCalled();
+});
+
+test.each(['', '   ', 'k'.repeat(129), 123])(
+  'rejects invalid key %j',
+  async (key) => {
+    const { repo, service } = setup();
+    const command = { ...input, idempotencyKey: key as string };
+
+    expect(await service.create(user, command)).toEqual({
+      kind: 'validation-error',
+    });
+    expect(repo.create).not.toHaveBeenCalled();
+  },
+);
+
+test('accepts a 128-character key', async () => {
+  const { repo, service } = setup();
+  const command = { ...input, idempotencyKey: 'k'.repeat(128) };
+
+  expect(await service.create(user, command)).toEqual({
+    kind: 'product-not-found',
+  });
+  expect(repo.create).toHaveBeenCalledWith({ ...command, userId: user.id });
+});
+
+test.each([0, -1, 1.5, NaN, Infinity, 2147483648])(
+  'rejects invalid reservation ID %s',
+  async (id) => {
+    const { repo, service } = setup();
+
+    expect(await service.cancel(user, id)).toEqual({
+      kind: 'validation-error',
+    });
+    expect(await service.issue(worker, id)).toEqual({
+      kind: 'validation-error',
+    });
+    expect(repo.cancel).not.toHaveBeenCalled();
+    expect(repo.issue).not.toHaveBeenCalled();
+  },
+);
