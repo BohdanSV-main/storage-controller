@@ -32,5 +32,13 @@ export function isDbUnavailable(error: unknown): boolean {
     }
   }
 
+  if (
+    error instanceof Error &&
+    'clientVersion' in error &&
+    error.message === 'Connection terminated unexpectedly'
+  ) {
+    return true;
+  }
+
   return false;
 }
