@@ -149,7 +149,7 @@ test('returns 503 on connection loss', async () => {
       appOrigin: 'http://localhost',
       secureCookie: false,
     },
-    { log: createLog({ write() {} }) },
+    { log: createLog(process.stdout) },
   );
   const repo = createPrismaCatalogRepo(db);
   app.get('/db', () => repo.findAllWithStock());
