@@ -1,0 +1,14 @@
+**
+!package.json
+!package-lock.json
+!tsconfig.json
+!tsconfig.build.json
+!prisma7.config.ts
+!prisma/
+!prisma/**
+!src/
+!src/**
+!scripts/
+!scripts/write-version.js
+src/generated/
+src/**/*.test.ts

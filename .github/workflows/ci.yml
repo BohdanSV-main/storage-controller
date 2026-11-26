@@ -68,16 +68,32 @@ jobs:
         run: |
           echo 'DATABASE_URL=postgresql://ci:ci@127.0.0.1:5432/storage_controller_test' > .env.test
           echo 'SHADOW_DATABASE_URL=postgresql://ci:ci@127.0.0.1:5432/storage_controller_shadow' >> .env.test
+          echo 'SESSION_SECRET=test-only-session-secret-1234567' >> .env.test
+          echo 'APP_ORIGIN=http://127.0.0.1:3100' >> .env.test
           cp .env.test .env
+
       - run: npm run db:generate
       - run: npm run db:test:prepare
       - run: npm run test:db
       - run: npm --prefix frontend ci
       - run: npx playwright install --with-deps chromium
+
       - name: Run browser tests
         run: npm run test:e2e
-        env:
-          SESSION_SECRET: test-only-session-secret-1234567
+
+      - name: Build backend image
+        run: docker build --build-arg COMMIT_SHA="$GITHUB_SHA" -t komora-api .
+
+      - name: Check container startup and version
+        id: container
+        run: |
+          docker run -d --name komora-api --network host --env-file .env.test -e PORT=3100 komora-api
+          curl -fsS --retry 20 --retry-connrefused --retry-delay 1 http://127.0.0.1:3100/health
+          curl -fsS http://127.0.0.1:3100/version | grep -F "$GITHUB_SHA"
+
+      - name: Show container logs on failure
+        if: failure() && steps.container.outcome == 'failure'
+        run: docker logs komora-api
 
   commits:
     if: github.event_name == 'pull_request'
