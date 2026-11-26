@@ -24,7 +24,6 @@ jobs:
       - run: npm ci
       - run: npm run db:generate
       - run: npm run check
-      - run: exit 1 # Тестую червоний прогін
 
   frontend:
     runs-on: ubuntu-latest
