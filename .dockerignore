@@ -12,3 +12,11 @@
 !scripts/write-version.js
 src/generated/
 src/**/*.test.ts
+!frontend/
+!frontend/package.json
+!frontend/package-lock.json
+!frontend/index.html
+!frontend/tsconfig.json
+!frontend/vite.config.ts
+!frontend/src/
+!frontend/src/**

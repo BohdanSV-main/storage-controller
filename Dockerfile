@@ -1,3 +1,11 @@
+FROM node:24-bookworm-slim AS frontend
+
+WORKDIR /frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
 FROM node:24-bookworm-slim
 
 WORKDIR /app
@@ -26,6 +34,8 @@ RUN export COMMIT_SHA="${COMMIT_SHA:-$RENDER_GIT_COMMIT}" && \
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3000
+
+COPY --from=frontend /frontend/dist ./frontend/dist
 
 USER node
 EXPOSE 3000

@@ -11,7 +11,7 @@ if (
 }
 process.env.DATABASE_URL = env.DATABASE_URL;
 
-const baseURL = 'http://127.0.0.1:4173';
+const baseURL = 'http://127.0.0.1:3000';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -25,23 +25,16 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  webServer: [
-    {
-      command: 'node dist/index.js',
-      url: 'http://127.0.0.1:3000/health',
-      env: {
-        ...env,
-        DATA_SOURCE: 'postgres',
-        APP_ORIGIN: baseURL,
-        LOG_LEVEL: 'warn',
-      },
-      reuseExistingServer: false,
+  webServer: {
+    command: 'node dist/index.js',
+    url: baseURL + '/ready',
+    env: {
+      ...env,
+      PORT: '3000',
+      DATA_SOURCE: 'postgres',
+      APP_ORIGIN: baseURL,
+      LOG_LEVEL: 'warn',
     },
-    {
-      command: 'npm --prefix frontend run preview -- --port 4173',
-      url: baseURL,
-      env: { API_TARGET: 'http://127.0.0.1:3000' },
-      reuseExistingServer: false,
-    },
-  ],
+    reuseExistingServer: false,
+  },
 });

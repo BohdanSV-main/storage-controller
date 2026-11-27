@@ -81,15 +81,22 @@ jobs:
       - name: Run browser tests
         run: npm run test:e2e
 
-      - name: Build backend image
+      - name: Build application image
         run: docker build --build-arg COMMIT_SHA="$GITHUB_SHA" -t komora-api .
 
-      - name: Check container startup and version
+      - name: Check container readiness, version and frontend
         id: container
         run: |
           docker run -d --name komora-api --network host --env-file .env.test -e PORT=3100 komora-api
           curl -fsS --retry 20 --retry-connrefused --retry-delay 1 http://127.0.0.1:3100/ready
           curl -fsS http://127.0.0.1:3100/version | grep -F "$GITHUB_SHA"
+          base=http://127.0.0.1:3100
+          curl -fsSL -H 'Accept: text/html' "$base/" | grep -F 'id="root"'
+          html=$(curl -fsS -H 'Accept: text/html' "$base/app/login")
+          asset=$(echo "$html" | grep -oE '/app/assets/[^"]+\.js' | head -1)
+          test -n "$asset"
+          curl -fsS "$base$asset" -o /dev/null
+          test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/api/auth/me")" = 401
 
       - name: Show container logs on failure
         if: failure() && steps.container.outcome == 'failure'

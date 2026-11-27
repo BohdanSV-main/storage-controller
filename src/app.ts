@@ -16,6 +16,7 @@ export interface AppDeps {
 
 export function buildApp(sha: string, config: AppConfig, deps: AppDeps = {}) {
   const app = Fastify({
+    trustProxy: process.env.RENDER === 'true' ? (_ip, hop) => hop === 0 : false,
     loggerInstance: deps.log ?? log,
     genReqId: () => randomUUID(),
     ajv: {

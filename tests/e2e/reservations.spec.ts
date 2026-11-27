@@ -5,11 +5,11 @@ test('reserves stock and restores it after cancellation', async ({
   account,
   product,
 }) => {
-  await page.goto('/login');
+  await page.goto('/app/login');
   await page.getByLabel('Email', { exact: true }).fill(account.email);
   await page.getByLabel('Пароль', { exact: true }).fill(account.password);
   await page.getByRole('button', { name: 'Увійти в Комору' }).click();
-  await expect(page).toHaveURL('/catalog');
+  await expect(page).toHaveURL('/app/catalog');
 
   const card = page
     .getByRole('article')
@@ -51,11 +51,11 @@ test('issues a reservation without reducing available stock twice', async ({
   worker,
   product,
 }) => {
-  await page.goto('/login');
+  await page.goto('/app/login');
   await page.getByLabel('Email', { exact: true }).fill(account.email);
   await page.getByLabel('Пароль', { exact: true }).fill(account.password);
   await page.getByRole('button', { name: 'Увійти в Комору' }).click();
-  await expect(page).toHaveURL('/catalog');
+  await expect(page).toHaveURL('/app/catalog');
 
   const card = page
     .getByRole('article')
@@ -77,11 +77,11 @@ test('issues a reservation without reducing available stock twice', async ({
   try {
     const staff = await context.newPage();
 
-    await staff.goto('/login');
+    await staff.goto('/app/login');
     await staff.getByLabel('Email', { exact: true }).fill(worker.email);
     await staff.getByLabel('Пароль', { exact: true }).fill(worker.password);
     await staff.getByRole('button', { name: 'Увійти в Комору' }).click();
-    await expect(staff).toHaveURL('/warehouse');
+    await expect(staff).toHaveURL('/app/warehouse');
 
     const ticket = staff
       .getByRole('article')

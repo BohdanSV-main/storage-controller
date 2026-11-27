@@ -2,12 +2,14 @@ import { readFileSync } from 'node:fs';
 import { log, withLog } from './log.js';
 import { readConfig } from './config.js';
 import { createApp } from './create-app.js';
+import { registerFrontend } from './plugins/frontend.js';
 
 await withLog(async () => {
   const file = new URL('./version.txt', import.meta.url);
   const sha = readFileSync(file, 'utf8').trim();
   const app = await createApp(sha, readConfig());
   try {
+    registerFrontend(app);
     const host = process.env.HOST ?? '127.0.0.1';
     const port = Number(process.env.PORT ?? 3000);
 
