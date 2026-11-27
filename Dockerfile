@@ -18,7 +18,10 @@ RUN DATABASE_URL=postgresql://build:build@localhost/build \
     ./node_modules/.bin/prisma generate --config prisma7.config.ts
 
 ARG COMMIT_SHA
-RUN test -n "$COMMIT_SHA" && COMMIT_SHA="$COMMIT_SHA" npm run build
+ARG RENDER_GIT_COMMIT
+RUN export COMMIT_SHA="${COMMIT_SHA:-$RENDER_GIT_COMMIT}" && \
+    test -n "$COMMIT_SHA" && \
+    npm run build
 
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
