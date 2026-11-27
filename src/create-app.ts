@@ -31,17 +31,17 @@ async function createStorage(source: ServerConfig['dataSource']) {
     reservationRepo: createMemoryReservationRepo(store),
     readRepo: createMemoryReservationReadRepo(store),
     sessionStore: undefined,
+    checkReady: undefined,
     close: undefined,
   };
 }
 
 export async function createApp(sha: string, config: ServerConfig) {
   const storage = await createStorage(config.dataSource);
-  const app = buildApp(
-    sha,
-    config,
-    storage.sessionStore ? { sessionStore: storage.sessionStore } : {},
-  );
+  const app = buildApp(sha, config, {
+    ...(storage.sessionStore && { sessionStore: storage.sessionStore }),
+    ...(storage.checkReady && { checkReady: storage.checkReady }),
+  });
   if (storage.close) app.addHook('onClose', storage.close);
   const authService = createAuthService({
     userRepo: storage.userRepo,

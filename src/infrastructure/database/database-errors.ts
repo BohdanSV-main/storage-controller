@@ -12,7 +12,8 @@ const unavailableCodes = new Set([
 
 export function isDbUnavailable(error: unknown): boolean {
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    return unavailableCodes.has(error.code);
+    if (error.code !== 'P2010') return unavailableCodes.has(error.code);
+    error = error.meta?.driverAdapterError;
   }
 
   if (error instanceof Prisma.PrismaClientInitializationError) {
