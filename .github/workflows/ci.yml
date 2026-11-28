@@ -40,35 +40,82 @@ jobs:
       - run: npm ci
       - run: npm run check
 
-    db:
-      runs-on: ubuntu-latest
-      services:
-        postgres:
-          image: postgres:17
-          env:
-            POSTGRES_USER: ci
-            POSTGRES_PASSWORD: ci
-            POSTGRES_DB: storage_controller_test
-          ports:
-            - 5432:5432
-          options: >-
-            --health-cmd "pg_isready -U ci -d storage_controller_test"
-            --health-interval 5s
-            --health-timeout 5s
-            --health-retries 10
+  db:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: storage_controller_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d storage_controller_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
-      steps:
-        - uses: actions/checkout@v4
-        - uses: actions/setup-node@v4
-          with:
-            node-version: 24
-            cache: npm
-        - run: npm ci
-        - name: Configure test database
-          run: |
-            echo 'DATABASE_URL=postgresql://ci:ci@127.0.0.1:5432/storage_controller_test' > .env.test
-            echo 'SHADOW_DATABASE_URL=postgresql://ci:ci@127.0.0.1:5432/storage_controller_shadow' >> .env.test
-            cp .env.test .env
-        - run: npm run db:generate
-        - run: npm run db:test:prepare
-        - run: npm run test:db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Configure test database
+        run: |
+          echo 'DATABASE_URL=postgresql://ci:ci@127.0.0.1:5432/storage_controller_test' > .env.test
+          echo 'SHADOW_DATABASE_URL=postgresql://ci:ci@127.0.0.1:5432/storage_controller_shadow' >> .env.test
+          echo 'SESSION_SECRET=test-only-session-secret-1234567' >> .env.test
+          echo 'APP_ORIGIN=http://127.0.0.1:3100' >> .env.test
+          cp .env.test .env
+
+      - run: npm run db:generate
+      - run: npm run db:test:prepare
+      - run: npm run test:db
+      - run: npm --prefix frontend ci
+      - run: npx playwright install --with-deps chromium
+
+      - name: Run browser tests
+        run: npm run test:e2e
+
+      - name: Build application image
+        run: docker build --build-arg COMMIT_SHA="$GITHUB_SHA" -t komora-api .
+
+      - name: Check container readiness, version and frontend
+        id: container
+        run: |
+          docker run -d --name komora-api --network host --env-file .env.test -e PORT=3100 komora-api
+          curl -fsS --retry 20 --retry-connrefused --retry-delay 1 http://127.0.0.1:3100/ready
+          curl -fsS http://127.0.0.1:3100/version | grep -F "$GITHUB_SHA"
+          base=http://127.0.0.1:3100
+          curl -fsSL -H 'Accept: text/html' "$base/" | grep -F 'id="root"'
+          html=$(curl -fsS -H 'Accept: text/html' "$base/app/login")
+          asset=$(echo "$html" | grep -oE '/app/assets/[^"]+\.js' | head -1)
+          test -n "$asset"
+          curl -fsS "$base$asset" -o /dev/null
+          test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/api/auth/me")" = 401
+
+      - name: Show container logs on failure
+        if: failure() && steps.container.outcome == 'failure'
+        run: docker logs komora-api
+
+  commits:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Check commit messages
+        run: npx commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}

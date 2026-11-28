@@ -1,3 +1,4 @@
+import type { FastifyInstance } from 'fastify';
 import { buildApp } from './app.js';
 import type { ServerConfig } from './config.js';
 import { argon2Hasher } from './infrastructure/security/argon2-password-hasher.js';
@@ -31,34 +32,37 @@ async function createStorage(source: ServerConfig['dataSource']) {
     reservationRepo: createMemoryReservationRepo(store),
     readRepo: createMemoryReservationReadRepo(store),
     sessionStore: undefined,
+    checkReady: undefined,
     close: undefined,
   };
 }
 
 export async function createApp(sha: string, config: ServerConfig) {
   const storage = await createStorage(config.dataSource);
-  const app = buildApp(
-    sha,
-    config,
-    storage.sessionStore ? { sessionStore: storage.sessionStore } : {},
-  );
+  const app = buildApp(sha, config, {
+    ...(storage.sessionStore && { sessionStore: storage.sessionStore }),
+    ...(storage.checkReady && { checkReady: storage.checkReady }),
+  });
   if (storage.close) app.addHook('onClose', storage.close);
   const authService = createAuthService({
     userRepo: storage.userRepo,
     passwordHasher: argon2Hasher,
   });
-  registerAuthRoutes(app, authService);
-  registerCatalogRoutes(app, {
-    authService,
-    catalogService: createCatalogService(storage.catalogRepo),
-  });
-  registerReservationRoutes(app, {
-    authService,
-    reservationService: createReservationService(storage.reservationRepo),
-  });
-  registerReservationReadRoutes(app, {
-    authService,
-    reservationReadService: createReservationReadService(storage.readRepo),
-  });
+  const catalogService = createCatalogService(storage.catalogRepo);
+  const reservationService = createReservationService(storage.reservationRepo);
+  const reservationReadService = createReservationReadService(storage.readRepo);
+
+  function registerRoutes(server: FastifyInstance) {
+    registerAuthRoutes(server, authService);
+    registerCatalogRoutes(server, { authService, catalogService });
+    registerReservationRoutes(server, { authService, reservationService });
+    registerReservationReadRoutes(server, {
+      authService,
+      reservationReadService,
+    });
+  }
+
+  registerRoutes(app);
+  app.register(async (api) => registerRoutes(api), { prefix: '/api' });
   return app;
 }

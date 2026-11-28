@@ -27,6 +27,9 @@ function databaseError(code: string) {
 }
 
 test.each([
+  Object.assign(new Error('Connection terminated unexpectedly'), {
+    clientVersion: '7.10.1',
+  }),
   new Prisma.PrismaClientInitializationError(
     'Internal connection details',
     '7.10.1',

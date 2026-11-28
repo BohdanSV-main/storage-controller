@@ -24,6 +24,10 @@ export async function createDbStorage() {
     reservationRepo: createPrismaReservationRepo(db),
     readRepo: createPrismaReservationReadRepo(db),
     sessionStore: createPrismaSessionStore(db),
+
+    async checkReady() {
+      await db.$queryRaw`SELECT 1`;
+    },
     async close() {
       try {
         await stop();

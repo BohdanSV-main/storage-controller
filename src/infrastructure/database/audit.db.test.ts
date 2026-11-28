@@ -149,12 +149,18 @@ test('returns 503 on connection loss', async () => {
       appOrigin: 'http://localhost',
       secureCookie: false,
     },
-    { log: createLog({ write() {} }) },
+    {
+      log: createLog(process.stdout),
+      checkReady: async () => {
+        await db.$queryRaw`SELECT 1`;
+      },
+    },
   );
   const repo = createPrismaCatalogRepo(db);
   app.get('/db', () => repo.findAllWithStock());
   try {
     expect((await app.inject('/db')).statusCode).toBe(200);
+    expect((await app.inject('/ready')).statusCode).toBe(200);
     online = false;
     for (const socket of sockets) socket.destroy();
     const res = await app.inject('/db');
@@ -165,8 +171,10 @@ test('returns 503 on connection loss', async () => {
         message: 'Required storage is temporarily unavailable.',
       },
     });
+    expect((await app.inject('/ready')).statusCode).toBe(503);
     online = true;
     expect((await app.inject('/db')).statusCode).toBe(200);
+    expect((await app.inject('/ready')).statusCode).toBe(200);
   } finally {
     await app.close();
     await db.$disconnect();

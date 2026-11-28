@@ -114,7 +114,7 @@ function RolePage({ role }: { role: 'USER' | 'WORKER' }) {
 
 export function Router() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Suspense
         fallback={
           <main>
